@@ -6,6 +6,7 @@ except ImportError:
     import json
 
 import requests
+from time import sleep
 
 try:
     from requests.packages.urllib3 import fields
@@ -26,6 +27,7 @@ FILE_URL = None
 
 CONNECT_TIMEOUT = 3.5
 READ_TIMEOUT = 9999
+MAX_REQUEST_TRIES = 3
 
 CUSTOM_SERIALIZER = None
 
@@ -59,8 +61,15 @@ def _make_request(token, method_name, method='get', params=None, files=None):
     if params:
         if 'timeout' in params: read_timeout = params['timeout'] + 10
         if 'connect-timeout' in params: connect_timeout = params['connect-timeout'] + 10
-    result = _get_req_session().request(method, request_url, params=params, files=files,
-                                        timeout=(connect_timeout, read_timeout), proxies=proxy)
+
+    for _ in range(MAX_REQUEST_TRIES):
+        try:
+            result = _get_req_session().request(method, request_url, params=params, files=files,
+                                                timeout=(connect_timeout, read_timeout), proxies=proxy)
+            break
+        except requests.exceptions.ConnectionError:
+            sleep(CONNECT_TIMEOUT)
+            
     logger.debug("The server returned: '{0}'".format(result.text.encode('utf8')))
     return _check_result(method_name, result)['result']
 
